@@ -17,11 +17,16 @@ el dialogo (popups encima de la cabeza del personaje, o un cuadro con texto abaj
 darle opciones para responder, etc)
 
 5- Buscar o disenhar e ir cargando texturas que se vayan a usar en el juego, cartas de blackjack, chips de apuesta, mesa etc etc.
-NOTA: por ahora el engine soporta la carga de texturas de .obj con .mtl nomas por lo que 
+Guardar todas las referencias para dar creditos en un txt o pdf para poder agregar luego al reporte y a los creditos del juego
+NOTA: por ahora el engine soporta la carga de texturas de .obj con .mtl nomas por lo que mejor si se busca esos tipos de archivos.
+NOTA2: se puede optar por cambiar tambien la manera de loadear las textures pero es bastante complejo, si no se encuentran los
+recursos necesarios en los formatos mencionados, se va a considerar cambiar a .blend, hablar del tema
+
 
 
 6- Preparar la musica y efectos de sonido del juego, asi como preparar una manera de cambiar el volumen 
 LUEGO IMPLEMENTAR CON EL PUNTO 3 que es incluir eso en el menu -> audio settings
+guardar todas las referencias y demas para dar los creditos en el juego y en el reporte
 
 7- Crear el menu de inicio del juego, con las opciones de iniciar juego, salir de juego, settings, creditos 
 (esto trata de escenas y cambio de escenas y game states y demas que es logica muy core del juego, por lo que puede ser un poco
