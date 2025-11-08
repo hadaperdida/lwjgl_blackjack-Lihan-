@@ -36,9 +36,14 @@ public class Window {
         glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
         glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
         
+        //anti-aliasing
+        if(opts.antiAliasing){
+            glfwWindowHint(GLFW_SAMPLES, 4);
+        }
+        
         //set OpenGL version
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 
         //either core or compatible profeile depending on window options
         if (opts.compatibleProfile){
@@ -79,7 +84,7 @@ public class Window {
                 Logger.error("Error code [{}], msg [{}]", errorCode, MemoryUtil.memUTF8(msgPtr))
         );
 
-        glfwSetKeyCallback(windowHandle, (_, key, _, action, _) -> {
+        glfwSetKeyCallback(windowHandle, (ignore0, key, ignore1, action, _) -> {
             keyCallBack(key, action);
         });
 
@@ -186,12 +191,17 @@ public class Window {
     public static class WindowOptions {
 
         public boolean compatibleProfile;   //controls wheter we want to use old functions from previous versions
+        public boolean antiAliasing;        
 
         public int fps;     //target frames per second
 
         //desired windows size
-        public int height = Consts.HEIGHT;  
-        public int width = Consts.WIDTH;
+        // public int height = Consts.HEIGHT;  
+        // public int width = Consts.WIDTH;
+
+        //default window size
+        public int height = 0;
+        public int width = 0;
 
         public int ups = Consts.TARGET_UPS; //target numbers of updates per second (inti to default)
 

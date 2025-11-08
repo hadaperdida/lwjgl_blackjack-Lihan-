@@ -1,5 +1,7 @@
 package blackjack.engine.scene;
 
+import org.joml.Vector3f;
+
 /*this class is used to load 3D models with Assimp (open asset import library)   */
 
 import org.joml.Vector4f;
@@ -29,7 +31,8 @@ public class ModelLoader {
             modelId, modelPath, textureCache,
             aiProcess_JoinIdenticalVertices | aiProcess_Triangulate |
             aiProcess_FixInfacingNormals | aiProcess_CalcTangentSpace |
-            aiProcess_LimitBoneWeights | aiProcess_PreTransformVertices
+            aiProcess_LimitBoneWeights | aiProcess_GenBoundingBoxes |
+            aiProcess_PreTransformVertices
         );
 
     }
@@ -111,12 +114,35 @@ public class ModelLoader {
             
             AIColor4D color = AIColor4D.create();
 
-            int result = aiGetMaterialColor(aiMaterial, AI_MATKEY_COLOR_DIFFUSE, aiTextureType_NONE, 0, color);
+            //~~ light work haha ~~//
+            //ambient
+            int result = aiGetMaterialColor(aiMaterial, AI_MATKEY_COLOR_AMBIENT, aiTextureType_NONE, 0, color);
+            if(result == aiReturn_SUCCESS)
+                material.setAmbientColor(new Vector4f(color.r(), color.g(), color.b(), color.a()));
 
-            if (result == aiReturn_SUCCESS){
+            //diffuse
+            result = aiGetMaterialColor(aiMaterial, AI_MATKEY_COLOR_DIFFUSE, aiTextureType_NONE, 0, color);
+            if(result == aiReturn_SUCCESS)
                 material.setDiffusecolor(new Vector4f(color.r(), color.g(), color.b(), color.a()));
-            }
+            
+            //specular
+            result = aiGetMaterialColor(aiMaterial, AI_MATKEY_COLOR_SPECULAR, aiTextureType_NONE, 0, color);
+            if(result == aiReturn_SUCCESS)
+                material.setSpecularColor(new Vector4f(color.r(), color.g(), color.b(), color.a()));
+            
+            //reflectance
+            float reflectance = 0.0f;
+            float[] shininessFacotr = new float[]{0.0f};
+            int[] pMax = new int[]{1};
 
+            result = aiGetMaterialFloatArray(aiMaterial, AI_MATKEY_SHININESS_STRENGTH, aiTextureType_NONE, 0, shininessFacotr, pMax);
+            
+            if (result == aiReturn_SUCCESS)
+                reflectance = shininessFacotr[0];
+            
+            material.setReflectance(reflectance);
+
+            //texture
             AIString aiTexturePath = AIString.calloc(stack);
 
             aiGetMaterialTexture(
@@ -134,6 +160,18 @@ public class ModelLoader {
                 material.setDiffusecolor(Consts.DEFAULT_COLOR);
 
             }
+            
+            //normalsMap
+            AIString aiNormalMapPath = AIString.calloc(stack);
+            Assimp.aiGetMaterialTexture(aiMaterial, aiTextureType_NORMALS, 0, aiNormalMapPath, 
+                    (IntBuffer) null, null, null, null, null, null);
+
+            String normalMapPath = aiNormalMapPath.dataString();
+
+            if (normalMapPath != null && normalMapPath.length() > 0) {
+                material.setNormalMapPath(modelDir + File.separator + new File(normalMapPath).getName());
+                textureCache.createTexture(material.getNormalMapPath());
+            }
 
             return material;
         }
@@ -142,8 +180,13 @@ public class ModelLoader {
     private static Mesh processMesh(AIMesh aiMesh){
 
         float[] vertices = processVertices(aiMesh);
+        float[] normals = processNormals(aiMesh);
         float[] textCoords = processTextCoords(aiMesh);
         int[] indices = processIndices(aiMesh);
+
+        //load data for tangents and bitangents
+        float[] tangents = processTangents(aiMesh, normals);
+        float[] bitangents = processBitangents(aiMesh, normals);
 
         //texture coords may not have been populated, we need at least the empty slots
         if (textCoords.length == 0){
@@ -151,7 +194,11 @@ public class ModelLoader {
             textCoords = new float[numElements];
         }
 
-        return new Mesh(vertices, textCoords, indices);
+        AIAABB aabb = aiMesh.mAABB();
+        Vector3f aabbMin = new Vector3f(aabb.mMin().x(), aabb.mMin().y(), aabb.mMin().z());
+        Vector3f aabbMax = new Vector3f(aabb.mMax().x(), aabb.mMax().y(), aabb.mMax().z());
+
+        return new Mesh(vertices, normals, tangents, bitangents, textCoords, indices, aabbMin, aabbMax);
     }
 
     /*the process verts, textCoords and indices just invoke the 
@@ -174,6 +221,21 @@ public class ModelLoader {
         }
 
         return indices.stream().mapToInt(Integer::intValue).toArray();
+    }
+
+    private static float[] processNormals(AIMesh aiMesh){
+
+        AIVector3D.Buffer buffer = aiMesh.mNormals();
+        float[] data = new float[buffer.remaining() * 3];
+        int pos = 0;
+
+        while (buffer.remaining() > 0){
+            AIVector3D normal = buffer.get();
+            data[pos++] = normal.x();
+            data[pos++] = normal.y();
+            data[pos++] = normal.z();
+        }
+        return data;
     }
 
     private static float[] processTextCoords(AIMesh aiMesh){
@@ -216,4 +278,40 @@ public class ModelLoader {
         return data;
     }
 
+    private static float[] processBitangents(AIMesh aiMesh, float[] normals){
+        AIVector3D.Buffer buffer = aiMesh.mBitangents();
+        float[] data = new float[buffer.remaining() * 3];
+        int pos = 0;
+        while (buffer.remaining() > 0) {
+            AIVector3D aiBitangent = buffer.get();
+            data[pos++] = aiBitangent.x();
+            data[pos++] = aiBitangent.y();
+            data[pos++] = aiBitangent.z();
+        }
+
+        // Assimp may not calculate tangents with models that do not have texture coordinates. Just create empty values
+        if (data.length == 0) {
+            data = new float[normals.length];
+        }
+        return data;
+    }
+
+    private static float[] processTangents(AIMesh aiMesh, float[] normals) {
+
+        AIVector3D.Buffer buffer = aiMesh.mTangents();
+        float[] data = new float[buffer.remaining() * 3];
+        int pos = 0;
+        while (buffer.remaining() > 0) {
+            AIVector3D aiTangent = buffer.get();
+            data[pos++] = aiTangent.x();
+            data[pos++] = aiTangent.y();
+            data[pos++] = aiTangent.z();
+        }
+
+        // Assimp may not calculate tangents with models that do not have texture coordinates. Just create empty values
+        if (data.length == 0) {
+            data = new float[normals.length];
+        }
+        return data;
+    }
 }
